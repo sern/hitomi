@@ -220,13 +220,26 @@ class Api(object):
         self.dirname = (
             sanitize_filename(self.metadata["title"]) + f'|{self.metadata["language"]}'
         )
-        fp = os.path.join("_data", self.dirname)
-        if os.path.exists(fp):
+        dir = os.path.join("_data", self.dirname)
+
+        def is_duplicate(dir):
+            if os.path.exists(dir):
+                with open(os.path.join(dir, "_info.yml")) as f:
+                    if yaml.safe_load(f)["source"]["url"] == self.url:
+                        if (
+                            input(
+                                f"Do you want to repeat downloading {self.url}? (y/n; default is y)"
+                            )[0]
+                            == "n"
+                        ):
+                            return True
+
+        if is_duplicate(dir):
             i = 0
             while True:
                 i += 1
-                p = fp + "_" + str(i)
-                if not os.path.exists(p):
+                d = dir + "_" + str(i)
+                if not is_duplicate(d):
                     self.dirname += "_" + str(i)
                     break
         self.dirname_from_project_root = os.path.join("_data", self.dirname)
@@ -293,15 +306,19 @@ class Api(object):
                     for file in self.info["files"]
                 ]
 
+        logger.info(f"Finished downloading to: {os.getcwd()}")
         os.chdir(PROJECT_DIR)
         self.update_symlinks()
 
     def download_single(self, file):
-        logger.info("Downloading: " + file["name"])
+        fn = file["name"]
+        if os.path.exists(fn) and os.path.getsize(fn) > 0:
+            return
+        logger.info("Downloading: " + fn)
         r = self.s.get(file["url"])
         if r.status_code != 200:
             raise Exception("Failed to download: " + file["url"])
-        with open(file["name"], "wb") as f:
+        with open(fn, "wb") as f:
             f.write(r.content)
 
     def update_symlinks(self):
@@ -362,9 +379,34 @@ def update_symlinks_characters(dirname, characters):
 
 
 def main():
+    # import sys
+
+    # args = sys.argv
+    # cmd = args[1]
+
+    # if cmd == "init":
+    #     init_directory()
+    # else:
+    #     load_translations()
+    #     if cmd == "update-links":
+    #         update_symlinks_all()
+    #     elif cmd == "debug":
+    #         print(ATTRIBUTES_AND_FILES)
+    #     elif cmd == "dl" or args.cmd == "download":
+    #         metadata_only = False
+    #         if args[2] == "--metadata-only":
+    #             metadata_only = True
+    #             url = args[3]
+    #         else:
+    #             url = args[2]
+    #         api = Api(args.url)
+    #         api.download(metadata_only)
+    #     save_translations()
+
     import argparse
 
     parser = argparse.ArgumentParser(description="Download a gallery from hitomi.la")
+    # subparser = parser.add_subparsers(dest="cmd")
     parser.add_argument(
         "url", metavar="URL", type=str, nargs="?", help="Gallery URL",
     )
@@ -400,3 +442,4 @@ def main():
             api.download(args.metadata_only)
 
     save_translations()
+
