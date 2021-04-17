@@ -442,4 +442,3 @@ def main():
             api.download(args.metadata_only)
 
     save_translations()
-
